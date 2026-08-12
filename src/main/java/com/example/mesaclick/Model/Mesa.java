@@ -17,7 +17,7 @@ public class Mesa {
     private String estado_mesa;
 
     @Column(name = "codigo_qr_mesa")
-    private String codigoqr_mesa;
+    private String codigoQrMesa;
 
     public Mesa() {
     }
@@ -34,7 +34,7 @@ public class Mesa {
         return estado_mesa;
     }
 
-    public String getCodigoqr_mesa() {
-        return codigoqr_mesa;
-    }
+    public String getCodigoQrMesa() {
+        return codigoQrMesa;
+}
 }

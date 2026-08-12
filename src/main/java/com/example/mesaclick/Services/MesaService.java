@@ -20,7 +20,7 @@ public class MesaService {
     }
 
     public Mesa obtenerMesaPorCodigo(String codigo) {
-        return mesaRepository.buscarPorCodigo(codigo)
-                .orElse(null);
+        return mesaRepository.findByCodigoQrMesa(codigo)
+            .orElse(null);
     }
 }

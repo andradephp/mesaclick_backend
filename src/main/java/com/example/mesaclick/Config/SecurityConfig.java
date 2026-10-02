@@ -29,10 +29,11 @@ public class SecurityConfig {
                 UsernamePasswordAuthenticationFilter.class
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/usuario/**").authenticated()
-                .anyRequest().permitAll()
-            );
+    .requestMatchers("/api/auth/**").permitAll()
+    .requestMatchers("/api/admin/**").hasRole("ADMIN")
+    .requestMatchers("/api/usuario/**").authenticated()
+    .anyRequest().permitAll()
+);
 
         return http.build();
     }

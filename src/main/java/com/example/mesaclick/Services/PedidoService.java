@@ -21,6 +21,11 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.example.mesaclick.Dto.PedidoMeseroDTO;
+import com.example.mesaclick.Dto.PersonaPedidoDTO;
+import com.example.mesaclick.Dto.ProductoPedidoDTO;
+import java.util.ArrayList;
+
 @Service
 public class PedidoService {
 
@@ -65,7 +70,7 @@ public class PedidoService {
 
         pedido.setMesa(mesa);
 
-        pedido.setEstadoPedido("PENDIENTE");
+        pedido.setEstadoPedido("EN_PREPARACION");
 
         pedido.setFechaPedido(LocalDateTime.now());
 
@@ -207,4 +212,95 @@ public class PedidoService {
     return pedidoRepository.buscarPedidosPorMesa(idMesa);
 
 }
+
+public List<Pedido> obtenerTodosLosPedidos() {
+    return pedidoRepository.findAllByOrderByFechaPedidoDesc();
+}
+
+public Pedido marcarComoListo(Long idPedido) {
+    Pedido pedido = pedidoRepository.findById(idPedido)
+            .orElseThrow(() ->
+                    new RuntimeException("El pedido no existe"));
+
+    if (!"EN_PREPARACION".equals(pedido.getEstadoPedido())) {
+        throw new RuntimeException(
+                "Solo se pueden marcar como listos los pedidos en preparación");
+    }
+
+    pedido.setEstadoPedido("LISTO");
+    return pedidoRepository.save(pedido);
+}
+
+public Pedido marcarComoEntregado(Long idPedido) {
+    Pedido pedido = pedidoRepository.findById(idPedido)
+            .orElseThrow(() ->
+                    new RuntimeException("El pedido no existe"));
+
+    if (!"LISTO".equals(pedido.getEstadoPedido())) {
+        throw new RuntimeException(
+                "Solo se pueden entregar los pedidos que estén listos");
+    }
+
+    pedido.setEstadoPedido("ENTREGADO");
+    return pedidoRepository.save(pedido);
+}
+
+public List<PedidoMeseroDTO> obtenerPedidosParaMesero() {
+
+    List<Pedido> pedidos = pedidoRepository.findAllByOrderByFechaPedidoDesc();
+
+    List<PedidoMeseroDTO> resultado = new ArrayList<>();
+
+    for (Pedido pedido : pedidos) {
+
+        List<PedidoPersona> personas =
+        pedidoPersonaRepository.findByPedido_IdPedido(
+                pedido.getIdPedido()
+        );
+
+        List<PersonaPedidoDTO> personasDTO = new ArrayList<>();
+
+        for (PedidoPersona persona : personas) {
+
+            List<DetallePedido> detalles =
+                    detallePedidoRepository
+                            .findByPedidoPersona_IdPedidoPersona(
+                                    persona.getIdPedidoPersona()
+                            );
+
+            List<ProductoPedidoDTO> productosDTO = new ArrayList<>();
+
+            for (DetallePedido detalle : detalles) {
+
+                productosDTO.add(
+                        new ProductoPedidoDTO(
+                                detalle.getProducto().getNombreProducto(),
+                                detalle.getCantidad()
+                        )
+                );
+            }
+
+            personasDTO.add(
+                    new PersonaPedidoDTO(
+                            persona.getNombrePersona(),
+                            productosDTO
+                    )
+            );
+        }
+
+        PedidoMeseroDTO pedidoDTO = new PedidoMeseroDTO(
+                pedido.getIdPedido(),
+                pedido.getMesa().getNumero_mesa(),
+                pedido.getTotalPedido(),
+                pedido.getEstadoPedido(),
+                pedido.getFechaPedido(),
+                personasDTO
+        );
+
+        resultado.add(pedidoDTO);
+    }
+
+    return resultado;
+}
+
 }

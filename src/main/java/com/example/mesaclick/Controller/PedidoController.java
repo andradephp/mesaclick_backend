@@ -5,6 +5,7 @@ import com.example.mesaclick.Model.Pedido;
 import com.example.mesaclick.Services.PedidoService;
 
 import org.springframework.web.bind.annotation.*;
+import com.example.mesaclick.Dto.PedidoMeseroDTO;
 
 import java.util.List;
 
@@ -50,5 +51,47 @@ public class PedidoController {
         return pedidoService.obtenerPedidosPorMesa(idMesa);
 
     }
+
+    @GetMapping
+public List<Pedido> obtenerTodosLosPedidos() {
+    return pedidoService.obtenerTodosLosPedidos();
+}
+
+@PatchMapping("/{idPedido}/listo")
+public Pedido marcarComoListo(
+        @PathVariable Long idPedido,
+        org.springframework.security.core.Authentication autenticacion) {
+
+    if (autenticacion == null ||
+            autenticacion.getAuthorities().stream()
+                    .noneMatch(a -> a.getAuthority().equals("ROLE_COCINA"))) {
+        throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN,
+                "Solo cocina puede marcar pedidos como listos");
+    }
+
+    return pedidoService.marcarComoListo(idPedido);
+}
+
+@PatchMapping("/{idPedido}/entregado")
+public Pedido marcarComoEntregado(
+        @PathVariable Long idPedido,
+        org.springframework.security.core.Authentication autenticacion) {
+
+    if (autenticacion == null ||
+            autenticacion.getAuthorities().stream()
+                    .noneMatch(a -> a.getAuthority().equals("ROLE_MESERO"))) {
+        throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN,
+                "Solo el mesero puede marcar pedidos como entregados");
+    }
+
+    return pedidoService.marcarComoEntregado(idPedido);
+}
+
+@GetMapping("/mesero")
+public List<PedidoMeseroDTO> obtenerPedidosParaMesero() {
+    return pedidoService.obtenerPedidosParaMesero();
+}
 
 }

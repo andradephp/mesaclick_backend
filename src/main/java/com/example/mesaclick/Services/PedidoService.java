@@ -231,17 +231,27 @@ public Pedido marcarComoListo(Long idPedido) {
     return pedidoRepository.save(pedido);
 }
 
+
 public Pedido marcarComoEntregado(Long idPedido) {
     Pedido pedido = pedidoRepository.findById(idPedido)
             .orElseThrow(() ->
-                    new RuntimeException("El pedido no existe"));
+                    new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.NOT_FOUND,
+                            "El pedido no existe"
+                    ));
 
-    if (!"LISTO".equals(pedido.getEstadoPedido())) {
-        throw new RuntimeException(
-                "Solo se pueden entregar los pedidos que estén listos");
+    // El mesero puede entregar pedidos pendientes o listos.
+    String estado = pedido.getEstadoPedido();
+
+    if ("ENTREGADO".equals(estado)) {
+        throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                "Este pedido ya fue entregado"
+        );
     }
 
     pedido.setEstadoPedido("ENTREGADO");
+
     return pedidoRepository.save(pedido);
 }
 

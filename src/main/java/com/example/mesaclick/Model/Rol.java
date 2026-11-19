@@ -5,6 +5,7 @@ public enum Rol {
     CLIENTE,
     ADMIN,
     COCINA,
-    MESERO
+    MESERO,
+    CAJERO
 
 }

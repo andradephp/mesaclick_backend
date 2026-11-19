@@ -13,6 +13,8 @@ import com.example.mesaclick.Services.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class UsuarioService {
 
@@ -84,10 +86,11 @@ public class UsuarioService {
 
     // Solo se permite crear COCINA o MESERO
     if (dto.getRol() != Rol.COCINA &&
-        dto.getRol() != Rol.MESERO) {
+        dto.getRol() != Rol.MESERO && 
+        dto.getRol() != Rol.CAJERO) {
 
         throw new IllegalArgumentException(
-                "Solo se pueden crear usuarios de COCINA o MESERO"
+                "Solo se pueden crear usuarios de COCINA, MESERO o CAJERO"
         );
     }
 
@@ -147,4 +150,16 @@ public class UsuarioService {
 
         return usuario;
     }
+
+    public List<Usuario> obtenerPersonal() {
+
+    return usuarioRepository.findByRolIn(
+        List.of(
+            Rol.COCINA,
+            Rol.MESERO,
+            Rol.CAJERO
+        )
+    );
+}
+
 }

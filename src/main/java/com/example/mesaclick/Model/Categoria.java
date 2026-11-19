@@ -1,3 +1,4 @@
+
 package com.example.mesaclick.Model;
 
 import jakarta.persistence.*;
@@ -9,7 +10,7 @@ public class Categoria {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_categoria")
-    private Long idCategoria;
+    private Integer idCategoria;
 
     @Column(name = "nombre_categoria")
     private String nombreCategoria;
@@ -20,11 +21,11 @@ public class Categoria {
     public Categoria() {
     }
 
-    public Long getIdCategoria() {
+    public Integer getIdCategoria() {
         return idCategoria;
     }
 
-    public void setIdCategoria(Long idCategoria) {
+    public void setIdCategoria(Integer idCategoria) {
         this.idCategoria = idCategoria;
     }
 

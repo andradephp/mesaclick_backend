@@ -23,4 +23,15 @@ public class MesaService {
         return mesaRepository.findByCodigoQrMesa(codigo)
             .orElse(null);
     }
+
+    // Método nuevo para obtener el estado de la mesa mediante su código
+    public String obtenerEstadoPorCodigo(String codigo) {
+        Mesa mesa = obtenerMesaPorCodigo(codigo);
+        if (mesa != null) {
+            return mesa.getEstado_mesa();
+        }
+        return null;
+    }
+
+    
 }

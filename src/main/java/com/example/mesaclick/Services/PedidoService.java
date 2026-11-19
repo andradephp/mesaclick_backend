@@ -1,29 +1,34 @@
+
 package com.example.mesaclick.Services;
 
 import com.example.mesaclick.Dto.PedidoRequest;
 import com.example.mesaclick.Dto.PersonaRequest;
 import com.example.mesaclick.Dto.ProductoRequest;
+import com.example.mesaclick.Dto.PedidoMeseroDTO;
+import com.example.mesaclick.Dto.PersonaPedidoDTO;
+import com.example.mesaclick.Dto.ProductoPedidoDTO;
 
 import com.example.mesaclick.Model.Mesa;
 import com.example.mesaclick.Model.Pedido;
 import com.example.mesaclick.Model.PedidoPersona;
 import com.example.mesaclick.Model.DetallePedido;
 import com.example.mesaclick.Model.Producto;
+import com.example.mesaclick.Model.Atencion;
 
 import com.example.mesaclick.Repository.MesaRepository;
 import com.example.mesaclick.Repository.PedidoRepository;
 import com.example.mesaclick.Repository.PedidoPersonaRepository;
 import com.example.mesaclick.Repository.DetallePedidoRepository;
 import com.example.mesaclick.Repository.ProductoRepository;
+import com.example.mesaclick.Repository.AtencionRepository;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
-import com.example.mesaclick.Dto.PedidoMeseroDTO;
-import com.example.mesaclick.Dto.PersonaPedidoDTO;
-import com.example.mesaclick.Dto.ProductoPedidoDTO;
 import java.util.ArrayList;
 
 @Service
@@ -34,283 +39,360 @@ public class PedidoService {
     private final PedidoPersonaRepository pedidoPersonaRepository;
     private final DetallePedidoRepository detallePedidoRepository;
     private final ProductoRepository productoRepository;
+    private final AtencionRepository atencionRepository;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
             MesaRepository mesaRepository,
             PedidoPersonaRepository pedidoPersonaRepository,
             DetallePedidoRepository detallePedidoRepository,
-            ProductoRepository productoRepository
+            ProductoRepository productoRepository,
+            AtencionRepository atencionRepository
     ) {
         this.pedidoRepository = pedidoRepository;
         this.mesaRepository = mesaRepository;
         this.pedidoPersonaRepository = pedidoPersonaRepository;
         this.detallePedidoRepository = detallePedidoRepository;
         this.productoRepository = productoRepository;
+        this.atencionRepository = atencionRepository;
     }
 
+    // ==========================================
+    // CREAR PEDIDO DESDE EL CODIGO QR
+    // ==========================================
+
+    @Transactional
     public Pedido crearPedido(PedidoRequest request) {
+
+        if (request == null || request.getIdMesa() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Debes seleccionar una mesa válida"
+            );
+        }
+
+        if (request.getPersonas() == null ||
+                request.getPersonas().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El pedido debe contener al menos una persona"
+            );
+        }
+
+        // Bloquear la mesa antes de buscar la atención
+        Mesa mesa = mesaRepository.bloquearMesaPorId(
+                request.getIdMesa()
+        ).orElseThrow(() ->
+                new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "La mesa no existe"
+                )
+        );
+
+        // Buscar la atención activa
         
+Atencion atencion = atencionRepository
+        .buscarAtencionPorMesaYEstado(
+                mesa.getId_mesa(),
+                "ACTIVA"
+        )
+        .orElseGet(() -> {
 
-        // ==========================================
-        // 1. BUSCAR LA MESA
-        // ==========================================
+            // Crear una nueva atención
+            Atencion nuevaAtencion = new Atencion();
 
-        Mesa mesa = mesaRepository.findById(request.getIdMesa())
-                .orElseThrow(() ->
-                        new RuntimeException("La mesa no existe")
-                );
+            nuevaAtencion.setMesa(mesa);
+            nuevaAtencion.setEstadoAtencion("ACTIVA");
+            nuevaAtencion.setFechaApertura(
+                    LocalDateTime.now()
+            );
+
+            Atencion atencionGuardada =
+                    atencionRepository.save(nuevaAtencion);
+
+            // Marcar la mesa como ocupada
+            mesa.setEstado_mesa("OCUPADA");
+            mesaRepository.save(mesa);
+
+            return atencionGuardada;
+        });
 
 
-        // ==========================================
-        // 2. CREAR EL PEDIDO
-        // ==========================================
-
+        // Crear pedido asociado a la atención
         Pedido pedido = new Pedido();
 
         pedido.setMesa(mesa);
-
+        pedido.setAtencion(atencion);
         pedido.setEstadoPedido("EN_PREPARACION");
-
         pedido.setFechaPedido(LocalDateTime.now());
-
-        // Todavía no sabemos el total.
-        // Lo calcularemos más adelante.
-
         pedido.setTotalPedido(0.0);
-
-
-        // Guardamos primero el pedido
-        // para obtener su ID.
 
         pedido = pedidoRepository.save(pedido);
 
-
-        // ==========================================
-        // 3. VARIABLE PARA EL TOTAL GENERAL
-        // ==========================================
-
         double totalGeneral = 0.0;
 
+        // Guardar personas y productos
+        for (PersonaRequest personaRequest :
+                request.getPersonas()) {
 
-        // ==========================================
-        // 4. RECORRER LAS PERSONAS
-        // ==========================================
+            if (personaRequest.getProductos() == null ||
+                    personaRequest.getProductos().isEmpty()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Cada persona debe seleccionar al menos un producto"
+                );
+            }
 
-        for (PersonaRequest personaRequest : request.getPersonas()) {
-
-            PedidoPersona pedidoPersona = new PedidoPersona();
+            PedidoPersona pedidoPersona =
+                    new PedidoPersona();
 
             pedidoPersona.setPedido(pedido);
-
             pedidoPersona.setNombrePersona(
                     personaRequest.getNombre()
             );
-
             pedidoPersona.setSubtotal(0.0);
-            pedidoPersona = pedidoPersonaRepository.save(pedidoPersona);
+
+            pedidoPersona = pedidoPersonaRepository.save(
+                    pedidoPersona
+            );
 
             double subtotalPersona = 0.0;
-
-
-            // ======================================
-            // 5. RECORRER PRODUCTOS DE LA PERSONA
-            // ======================================
 
             for (ProductoRequest productoRequest :
                     personaRequest.getProductos()) {
 
-                // Buscar producto real en MySQL
+                if (productoRequest.getCantidad() <= 0) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "La cantidad debe ser mayor que cero"
+                    );
+                }
 
                 Producto producto =
                         productoRepository.findById(
                                 productoRequest.getIdProducto()
                         ).orElseThrow(() ->
-                                new RuntimeException(
-                                        "El producto no existe: "
-                                                + productoRequest.getIdProducto()
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "El producto no existe"
                                 )
                         );
-
-
-                // ==================================
-                // 6. CALCULAR SUBTOTAL DEL PRODUCTO
-                // ==================================
 
                 double subtotalProducto =
                         producto.getPrecioProducto()
                                 * productoRequest.getCantidad();
 
-
                 subtotalPersona += subtotalProducto;
 
-
-                // ==================================
-                // 7. CREAR DETALLE DEL PEDIDO
-                // ==================================
-
-                DetallePedido detalle = new DetallePedido();
+                DetallePedido detalle =
+                        new DetallePedido();
 
                 detalle.setPedidoPersona(pedidoPersona);
-
                 detalle.setProducto(producto);
-
                 detalle.setCantidad(
                         productoRequest.getCantidad()
                 );
-
                 detalle.setPrecioUnitario(
                         producto.getPrecioProducto()
                 );
 
-
-                // Guardar detalle
-
                 detallePedidoRepository.save(detalle);
             }
 
-
-            // ======================================
-            // 8. GUARDAR SUBTOTAL DE LA PERSONA
-            // ======================================
-
             pedidoPersona.setSubtotal(subtotalPersona);
-
             pedidoPersonaRepository.save(pedidoPersona);
-
-
-            // ======================================
-            // 9. SUMAR AL TOTAL GENERAL
-            // ======================================
 
             totalGeneral += subtotalPersona;
         }
 
-
-        // ==========================================
-        // 10. ACTUALIZAR TOTAL DEL PEDIDO
-        // ==========================================
-
         pedido.setTotalPedido(totalGeneral);
 
-        pedido = pedidoRepository.save(pedido);
-
-
-        // ==========================================
-        // 11. DEVOLVER PEDIDO
-        // ==========================================
-
-        return pedido;
+        return pedidoRepository.save(pedido);
     }
 
     // ==========================================
-    // OBTENER HISTORIAL DE UNA MESA
+    // OBTENER PEDIDOS DE LA ATENCION ACTIVA
     // ==========================================
 
+    @Transactional(readOnly = true)
     public List<Pedido> obtenerPedidosPorMesa(Long idMesa) {
 
-    return pedidoRepository.buscarPedidosPorMesa(idMesa);
-
-}
-
-public List<Pedido> obtenerTodosLosPedidos() {
-    return pedidoRepository.findAllByOrderByFechaPedidoDesc();
-}
-
-public Pedido marcarComoListo(Long idPedido) {
-    Pedido pedido = pedidoRepository.findById(idPedido)
-            .orElseThrow(() ->
-                    new RuntimeException("El pedido no existe"));
-
-    if (!"EN_PREPARACION".equals(pedido.getEstadoPedido())) {
-        throw new RuntimeException(
-                "Solo se pueden marcar como listos los pedidos en preparación");
+        return atencionRepository
+                .buscarAtencionPorMesaYEstado(
+                        idMesa,
+                        "ACTIVA"
+                )
+                .map(atencion ->
+                        pedidoRepository.buscarPedidosPorAtencion(
+                                atencion.getIdAtencion()
+                        )
+                )
+                .orElseGet(List::of);
     }
 
-    pedido.setEstadoPedido("LISTO");
-    return pedidoRepository.save(pedido);
-}
+    // ==========================================
+    // CONSULTAR TODOS LOS PEDIDOS
+    // ==========================================
 
-
-public Pedido marcarComoEntregado(Long idPedido) {
-    Pedido pedido = pedidoRepository.findById(idPedido)
-            .orElseThrow(() ->
-                    new org.springframework.web.server.ResponseStatusException(
-                            org.springframework.http.HttpStatus.NOT_FOUND,
-                            "El pedido no existe"
-                    ));
-
-    // El mesero puede entregar pedidos pendientes o listos.
-    String estado = pedido.getEstadoPedido();
-
-    if ("ENTREGADO".equals(estado)) {
-        throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.CONFLICT,
-                "Este pedido ya fue entregado"
-        );
+    @Transactional(readOnly = true)
+    public List<Pedido> obtenerTodosLosPedidos() {
+        return pedidoRepository
+                .findAllByOrderByFechaPedidoDesc();
     }
 
-    pedido.setEstadoPedido("ENTREGADO");
+    // ==========================================
+    // COCINA: MARCAR PEDIDO COMO LISTO
+    // ==========================================
 
-    return pedidoRepository.save(pedido);
-}
+    @Transactional
+    public Pedido marcarComoListo(Long idPedido) {
 
-public List<PedidoMeseroDTO> obtenerPedidosParaMesero() {
+        Pedido pedido = pedidoRepository.findById(idPedido)
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "El pedido no existe"
+                        )
+                );
 
-    List<Pedido> pedidos = pedidoRepository.findAllByOrderByFechaPedidoDesc();
+        if (!"EN_PREPARACION".equals(
+                pedido.getEstadoPedido()
+        )) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Solo se pueden marcar como listos los pedidos en preparación"
+            );
+        }
 
-    List<PedidoMeseroDTO> resultado = new ArrayList<>();
+        pedido.setEstadoPedido("LISTO");
 
-    for (Pedido pedido : pedidos) {
+        return pedidoRepository.save(pedido);
+    }
 
-        List<PedidoPersona> personas =
-        pedidoPersonaRepository.findByPedido_IdPedido(
-                pedido.getIdPedido()
-        );
+    // ==========================================
+    // MESERO: MARCAR PEDIDO COMO ENTREGADO
+    // ==========================================
 
-        List<PersonaPedidoDTO> personasDTO = new ArrayList<>();
+    @Transactional
+    public Pedido marcarComoEntregado(Long idPedido) {
 
-        for (PedidoPersona persona : personas) {
+        Pedido pedido = pedidoRepository.findById(idPedido)
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "El pedido no existe"
+                        )
+                );
 
-            List<DetallePedido> detalles =
-                    detallePedidoRepository
-                            .findByPedidoPersona_IdPedidoPersona(
-                                    persona.getIdPedidoPersona()
+        if (!"LISTO".equals(
+                pedido.getEstadoPedido()
+        )) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Solo se pueden entregar pedidos con estado LISTO"
+            );
+        }
+
+        pedido.setEstadoPedido("ENTREGADO");
+
+        return pedidoRepository.save(pedido);
+    }
+
+    // ==========================================
+    // CONSULTAR PEDIDOS PARA EL MESERO
+    // ==========================================
+
+    @Transactional(readOnly = true)
+    public List<PedidoMeseroDTO> obtenerPedidosParaMesero() {
+
+        List<Pedido> pedidos =
+                pedidoRepository
+                        .findAllByOrderByFechaPedidoDesc();
+
+        return mapearPedidosADTO(pedidos);
+    }
+
+    // ==========================================
+    // CONSULTAR PEDIDOS PARA CAJA
+    // COMPATIBILIDAD TEMPORAL
+    // ==========================================
+
+    @Transactional(readOnly = true)
+    public List<PedidoMeseroDTO> obtenerPedidosParaCajero() {
+
+        List<Pedido> pedidos =
+                pedidoRepository.findByEstadoPedido(
+                        "ENTREGADO"
+                );
+
+        return mapearPedidosADTO(pedidos);
+    }
+
+    // ==========================================
+    // CONVERTIR PEDIDOS A DTO
+    // ==========================================
+
+    private List<PedidoMeseroDTO> mapearPedidosADTO(
+            List<Pedido> pedidos
+    ) {
+
+        List<PedidoMeseroDTO> resultado =
+                new ArrayList<>();
+
+        for (Pedido pedido : pedidos) {
+
+            List<PedidoPersona> personas =
+                    pedidoPersonaRepository
+                            .findByPedido_IdPedido(
+                                    pedido.getIdPedido()
                             );
 
-            List<ProductoPedidoDTO> productosDTO = new ArrayList<>();
+            List<PersonaPedidoDTO> personasDTO =
+                    new ArrayList<>();
 
-            for (DetallePedido detalle : detalles) {
+            for (PedidoPersona persona : personas) {
 
-                productosDTO.add(
-                        new ProductoPedidoDTO(
-                                detalle.getProducto().getNombreProducto(),
-                                detalle.getCantidad()
+                List<DetallePedido> detalles =
+                        detallePedidoRepository
+                                .findByPedidoPersona_IdPedidoPersona(
+                                        persona.getIdPedidoPersona()
+                                );
+
+                List<ProductoPedidoDTO> productosDTO =
+                        new ArrayList<>();
+
+                for (DetallePedido detalle : detalles) {
+
+                    productosDTO.add(
+                            new ProductoPedidoDTO(
+                                    detalle.getProducto()
+                                            .getNombreProducto(),
+                                    detalle.getCantidad()
+                            )
+                    );
+                }
+
+                personasDTO.add(
+                        new PersonaPedidoDTO(
+                                persona.getNombrePersona(),
+                                productosDTO
                         )
                 );
             }
 
-            personasDTO.add(
-                    new PersonaPedidoDTO(
-                            persona.getNombrePersona(),
-                            productosDTO
-                    )
-            );
+            PedidoMeseroDTO pedidoDTO =
+                    new PedidoMeseroDTO(
+                            pedido.getIdPedido(),
+                            pedido.getMesa().getNumero_mesa(),
+                            pedido.getTotalPedido(),
+                            pedido.getEstadoPedido(),
+                            pedido.getFechaPedido(),
+                            personasDTO
+                    );
+
+            resultado.add(pedidoDTO);
         }
 
-        PedidoMeseroDTO pedidoDTO = new PedidoMeseroDTO(
-                pedido.getIdPedido(),
-                pedido.getMesa().getNumero_mesa(),
-                pedido.getTotalPedido(),
-                pedido.getEstadoPedido(),
-                pedido.getFechaPedido(),
-                personasDTO
-        );
-
-        resultado.add(pedidoDTO);
+        return resultado;
     }
-
-    return resultado;
-}
-
 }

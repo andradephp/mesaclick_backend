@@ -12,5 +12,18 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
     List<Pedido> buscarPedidosPorMesa(@Param("idMesa") Long idMesa);
 
     List<Pedido> findAllByOrderByFechaPedidoDesc();
-}
 
+    // Método añadido para filtrar los pedidos listos para cobro por el cajero
+    List<Pedido> findByEstadoPedido(String estadoPedido);
+
+
+    @Query("""
+    SELECT p FROM Pedido p
+    WHERE p.atencion.idAtencion = :idAtencion
+    ORDER BY p.fechaPedido ASC
+    """)
+    List<Pedido> buscarPedidosPorAtencion(
+        @Param("idAtencion") Long idAtencion
+);
+
+}

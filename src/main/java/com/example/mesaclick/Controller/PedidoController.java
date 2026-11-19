@@ -75,6 +75,31 @@ public List<PedidoMeseroDTO> obtenerPedidosPorMesa(
     }
 
     // ==========================================
+// COCINA - CONSULTAR PEDIDOS
+// ==========================================
+
+@GetMapping("/cocina")
+public List<PedidoMeseroDTO> obtenerPedidosParaCocina(
+        Authentication autenticacion
+) {
+
+    if (autenticacion == null ||
+            autenticacion.getAuthorities().stream()
+                    .noneMatch(a ->
+                            a.getAuthority().equals("ROLE_COCINA") ||
+                            a.getAuthority().equals("ROLE_ADMIN")
+                    )) {
+
+        throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Solo cocina puede consultar estos pedidos"
+        );
+    }
+
+    return pedidoService.obtenerPedidosParaMesero();
+}
+
+    // ==========================================
     // COCINA - MARCAR PEDIDO COMO LISTO
     // ==========================================
 

@@ -121,13 +121,20 @@ public class SecurityConfig {
                 ).hasAnyRole("CAJERO", "ADMIN")
 
                 // ======================================
-                // COCINA
-                // ======================================
+// COCINA
+// ======================================
 
-                .requestMatchers(
-                    HttpMethod.PATCH,
-                    "/api/pedidos/*/listo"
-                ).hasAnyRole("COCINA", "ADMIN")
+// Consultar pedidos de cocina
+.requestMatchers(
+    HttpMethod.GET,
+    "/api/pedidos/cocina"
+).hasAnyRole("COCINA", "ADMIN")
+
+// Marcar pedidos como listos
+.requestMatchers(
+    HttpMethod.PATCH,
+    "/api/pedidos/*/listo"
+).hasAnyRole("COCINA", "ADMIN")
 
                 // ======================================
                 // MESEROS

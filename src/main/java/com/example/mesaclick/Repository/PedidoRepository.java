@@ -26,4 +26,6 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
         @Param("idAtencion") Long idAtencion
 );
 
+long countByEstadoPedido(String estadoPedido);
+
 }

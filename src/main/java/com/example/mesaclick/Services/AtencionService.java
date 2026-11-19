@@ -339,23 +339,30 @@ return atencionRepository.save(atencion);
                                         persona.getIdPedidoPersona()
                                 );
 
-                for (DetallePedido detalle : detalles) {
+                
+for (DetallePedido detalle : detalles) {
 
-                    productosDTO.add(
-                            new ProductoPedidoDTO(
-                                    detalle.getProducto()
-                                            .getNombreProducto(),
-                                    detalle.getCantidad()
-                            )
-                    );
-                }
+    productosDTO.add(
+            new ProductoPedidoDTO(
+                    detalle.getProducto().getNombreProducto(),
+                    detalle.getCantidad(),
+                    detalle.getPrecioUnitario(),
+                    detalle.getPrecioUnitario()
+                            * detalle.getCantidad()
+            )
+    );
+}
 
-                personasDTO.add(
-                        new PersonaPedidoDTO(
-                                persona.getNombrePersona(),
-                                productosDTO
-                        )
-                );
+
+                
+personasDTO.add(
+        new PersonaPedidoDTO(
+                persona.getNombrePersona(),
+                persona.getSubtotal(),
+                productosDTO
+        )
+);
+        
             }
 
             pedidosDTO.add(

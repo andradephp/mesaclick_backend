@@ -178,6 +178,35 @@ Atencion atencion = atencionRepository
                                 )
                         );
 
+                        // ==========================================
+// VALIDAR DISPONIBILIDAD DEL PRODUCTO
+// ==========================================
+
+if (!Boolean.TRUE.equals(producto.getEstadoProducto())) {
+    throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "El producto '" + producto.getNombreProducto()
+                    + "' no está disponible actualmente"
+    );
+}
+
+// ==========================================
+// VALIDAR ESTADO DE LA CATEGORÍA
+// ==========================================
+
+if (producto.getCategoria() == null ||
+        !Boolean.TRUE.equals(
+                producto.getCategoria().getEstadoCategoria()
+        )) {
+
+    throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "La categoría del producto '"
+                    + producto.getNombreProducto()
+                    + "' no está disponible actualmente"
+    );
+}
+
                 double subtotalProducto =
                         producto.getPrecioProducto()
                                 * productoRequest.getCantidad();
@@ -214,21 +243,25 @@ Atencion atencion = atencionRepository
     // OBTENER PEDIDOS DE LA ATENCION ACTIVA
     // ==========================================
 
-    @Transactional(readOnly = true)
-    public List<Pedido> obtenerPedidosPorMesa(Long idMesa) {
+    
+@Transactional(readOnly = true)
+public List<PedidoMeseroDTO> obtenerPedidosPorMesa(Long idMesa) {
 
-        return atencionRepository
-                .buscarAtencionPorMesaYEstado(
-                        idMesa,
-                        "ACTIVA"
-                )
-                .map(atencion ->
-                        pedidoRepository.buscarPedidosPorAtencion(
-                                atencion.getIdAtencion()
-                        )
-                )
-                .orElseGet(List::of);
-    }
+    List<Pedido> pedidos = atencionRepository
+            .buscarAtencionPorMesaYEstado(
+                    idMesa,
+                    "ACTIVA"
+            )
+            .map(atencion ->
+                    pedidoRepository.buscarPedidosPorAtencion(
+                            atencion.getIdAtencion()
+                    )
+            )
+            .orElseGet(List::of);
+
+    return mapearPedidosADTO(pedidos);
+}
+
 
     // ==========================================
     // CONSULTAR TODOS LOS PEDIDOS
@@ -363,21 +396,28 @@ Atencion atencion = atencionRepository
 
                 for (DetallePedido detalle : detalles) {
 
-                    productosDTO.add(
-                            new ProductoPedidoDTO(
-                                    detalle.getProducto()
-                                            .getNombreProducto(),
-                                    detalle.getCantidad()
-                            )
-                    );
+                    
+                productosDTO.add(
+                        new ProductoPedidoDTO(
+                                detalle.getProducto().getNombreProducto(),
+                                detalle.getCantidad(),
+                                detalle.getPrecioUnitario(),
+                                detalle.getPrecioUnitario()
+                                        * detalle.getCantidad()
+        )
+);
+
                 }
 
+                
                 personasDTO.add(
                         new PersonaPedidoDTO(
                                 persona.getNombrePersona(),
+                                persona.getSubtotal(),
                                 productosDTO
-                        )
-                );
+        )
+);
+
             }
 
             PedidoMeseroDTO pedidoDTO =

@@ -16,6 +16,7 @@ public class ProductoService {
     }
 
     public List<Producto> obtenerTodos() {
-        return productoRepository.findAll();
-    }
+    return productoRepository
+            .findByEstadoProductoTrueAndCategoria_EstadoCategoriaTrue();
+}
 }

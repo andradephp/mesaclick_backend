@@ -1,7 +1,7 @@
 package com.example.mesaclick.Controller;
 
+import com.example.mesaclick.Dto.PedidoMeseroDTO;
 import com.example.mesaclick.Model.Mesa;
-import com.example.mesaclick.Model.Pedido;
 import com.example.mesaclick.Services.MesaService;
 import com.example.mesaclick.Services.PedidoService;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +15,11 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {
+    "http://localhost:5173",
+    "https://mesaclick.tech",
+    "https://www.mesaclick.tech"
+})
 public class MesaController {
 
     private final MesaService mesaService;
@@ -52,13 +56,20 @@ public class MesaController {
         return ResponseEntity.ok(respuesta);
     }
 
-    @GetMapping("/api/mesas/{codigo}/pedidos-activos")
-    public List<Pedido> obtenerPedidosActivosPorMesa(@PathVariable String codigo) {
-        Mesa mesa = mesaService.obtenerMesaPorCodigo(codigo);
-        if (mesa != null) {
-            // Usamos getId_mesa() respetando el nombre exacto de tu entidad Mesa
-            return pedidoService.obtenerPedidosPorMesa(mesa.getId_mesa());
-        }
-        return List.of();
+    
+@GetMapping("/api/mesas/{codigo}/pedidos-activos")
+public List<PedidoMeseroDTO> obtenerPedidosActivosPorMesa(
+        @PathVariable String codigo
+) {
+    Mesa mesa = mesaService.obtenerMesaPorCodigo(codigo);
+
+    if (mesa != null) {
+        return pedidoService.obtenerPedidosPorMesa(
+                mesa.getId_mesa()
+        );
     }
+
+    return List.of();
+}
+
 }

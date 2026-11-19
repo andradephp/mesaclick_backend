@@ -56,12 +56,14 @@ public class PedidoController {
     // PEDIDOS DE LA ATENCION ACTIVA
     // ==========================================
 
-    @GetMapping("/mesa/{idMesa}")
-    public List<Pedido> obtenerPedidosPorMesa(
-            @PathVariable Long idMesa
-    ) {
-        return pedidoService.obtenerPedidosPorMesa(idMesa);
-    }
+    
+@GetMapping("/mesa/{idMesa}")
+public List<PedidoMeseroDTO> obtenerPedidosPorMesa(
+        @PathVariable Long idMesa
+) {
+    return pedidoService.obtenerPedidosPorMesa(idMesa);
+}
+
 
     // ==========================================
     // CONSULTAR TODOS LOS PEDIDOS

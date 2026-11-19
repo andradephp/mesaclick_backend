@@ -1,3 +1,4 @@
+
 package com.example.mesaclick.Model;
 
 import jakarta.persistence.*;
@@ -14,8 +15,11 @@ public class Producto {
     @Column(name = "nombre_producto")
     private String nombreProducto;
 
-    @Column(name = "descripcion_producto")
+    @Column(name = "descripcion_producto", columnDefinition = "TEXT")
     private String descripcionProducto;
+
+    @Column(name = "ingredientes_producto", columnDefinition = "TEXT")
+    private String ingredientesProducto;
 
     @Column(name = "precio_producto")
     private Double precioProducto;
@@ -24,10 +28,10 @@ public class Producto {
     private String imagenProducto;
 
     @Column(name = "estado_producto")
-    private Boolean estadoProducto;
+    private Boolean estadoProducto = true;
 
     @ManyToOne
-    @JoinColumn(name = "id_categoria")
+    @JoinColumn(name = "id_categoria", nullable = false)
     private Categoria categoria;
 
     public Producto() {
@@ -55,6 +59,14 @@ public class Producto {
 
     public void setDescripcionProducto(String descripcionProducto) {
         this.descripcionProducto = descripcionProducto;
+    }
+
+    public String getIngredientesProducto() {
+        return ingredientesProducto;
+    }
+
+    public void setIngredientesProducto(String ingredientesProducto) {
+        this.ingredientesProducto = ingredientesProducto;
     }
 
     public Double getPrecioProducto() {

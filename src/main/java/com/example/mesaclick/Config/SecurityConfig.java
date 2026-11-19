@@ -41,43 +41,62 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
-            // API con autenticación JWT
             .csrf(csrf -> csrf.disable())
 
-            // Permitir conexiones desde React
+            // ======================================
+            // CORS
+            // ======================================
+
             .cors(cors ->
                 cors.configurationSource(corsConfigurationSource())
             )
 
-            // No utilizar sesiones de servidor
+            // ======================================
+            // SESIONES JWT
+            // ======================================
+
             .sessionManagement(session ->
                 session.sessionCreationPolicy(
                     SessionCreationPolicy.STATELESS
                 )
             )
 
-            // Validar el token JWT
+            // ======================================
+            // FILTRO JWT
+            // ======================================
+
             .addFilterBefore(
                 jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class
             )
 
+            // ======================================
+            // AUTORIZACIONES
+            // ======================================
+
             .authorizeHttpRequests(auth -> auth
 
-                // ======================================
-                // PETICIONES CORS
-                // ======================================
+                .requestMatchers("/error").permitAll()
+
+                // CORS PREFLIGHT
 
                 .requestMatchers(
                     HttpMethod.OPTIONS, "/**"
                 ).permitAll()
 
-                // ======================================
-                // AUTENTICACIÓN
-                // ======================================
+                // AUTENTICACION
 
                 .requestMatchers(
                     "/api/auth/**"
+                ).permitAll()
+
+                // ======================================
+                // IMAGENES PUBLICAS DE PRODUCTOS
+                // ======================================
+
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/imagenes/productos/**"
                 ).permitAll()
 
                 // ======================================
@@ -139,7 +158,7 @@ public class SecurityConfig {
                 ).permitAll()
 
                 // ======================================
-                // MENÚ Y MESAS
+                // MENU PUBLICO Y MESAS
                 // ======================================
 
                 .requestMatchers(
@@ -157,9 +176,7 @@ public class SecurityConfig {
                     "/api/usuario/**"
                 ).authenticated()
 
-                // ======================================
-                // DEMÁS ENDPOINTS
-                // ======================================
+                // DEMAS ENDPOINTS
 
                 .anyRequest().authenticated()
             );
@@ -168,7 +185,7 @@ public class SecurityConfig {
     }
 
     // ==========================================
-    // CONFIGURACIÓN CORS
+    // CONFIGURACION CORS
     // ==========================================
 
     @Bean
@@ -217,7 +234,7 @@ public class SecurityConfig {
     }
 
     // ==========================================
-    // ENCRIPTACIÓN DE CONTRASEÑAS
+    // ENCRIPTACION DE CONTRASEÑAS
     // ==========================================
 
     @Bean

@@ -16,6 +16,6 @@ public class CategoriaService {
     }
 
     public List<Categoria> obtenerTodas() {
-        return categoriaRepository.findAll();
-    }
+    return categoriaRepository.findByEstadoCategoriaTrue();
+}
 }

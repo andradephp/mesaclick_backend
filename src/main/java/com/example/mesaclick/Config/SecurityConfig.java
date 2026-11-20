@@ -3,6 +3,8 @@ package com.example.mesaclick.Config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+
 import org.springframework.http.HttpMethod;
 
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -46,7 +48,6 @@ public class SecurityConfig {
             // ======================================
             // CORS
             // ======================================
-
             .cors(cors ->
                 cors.configurationSource(corsConfigurationSource())
             )
@@ -54,7 +55,6 @@ public class SecurityConfig {
             // ======================================
             // SESIONES JWT
             // ======================================
-
             .sessionManagement(session ->
                 session.sessionCreationPolicy(
                     SessionCreationPolicy.STATELESS
@@ -64,7 +64,6 @@ public class SecurityConfig {
             // ======================================
             // FILTRO JWT
             // ======================================
-
             .addFilterBefore(
                 jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class
@@ -73,128 +72,147 @@ public class SecurityConfig {
             // ======================================
             // AUTORIZACIONES
             // ======================================
+            .authorizeHttpRequests(auth -> {
 
-            .authorizeHttpRequests(auth -> auth
-
-                .requestMatchers("/error").permitAll()
+                auth.requestMatchers("/error").permitAll();
 
                 // CORS PREFLIGHT
-
-                .requestMatchers(
+                auth.requestMatchers(
                     HttpMethod.OPTIONS, "/**"
-                ).permitAll()
+                ).permitAll();
 
-                // AUTENTICACION
-
-                .requestMatchers(
+                // ======================================
+                // AUTENTICACIÓN
+                // ======================================
+                auth.requestMatchers(
                     "/api/auth/**"
-                ).permitAll()
+                ).permitAll();
 
                 // ======================================
-                // IMAGENES PUBLICAS DE PRODUCTOS
+                // SUSCRIPCIONES DE CLIENTES
                 // ======================================
+                auth.requestMatchers(
+                    HttpMethod.POST,
+                    "/api/suscripciones"
+                ).permitAll();
 
-                .requestMatchers(
+                auth.requestMatchers(
+                    HttpMethod.GET,
+                    "/api/suscripciones/confirmar"
+                ).permitAll();
+
+                auth.requestMatchers(
+                    HttpMethod.POST,
+                    "/api/suscripciones/cancelar"
+                ).permitAll();
+
+
+                // ======================================
+                // IMÁGENES PÚBLICAS
+                // ======================================
+                auth.requestMatchers(
                     HttpMethod.GET,
                     "/imagenes/productos/**"
-                ).permitAll()
+                ).permitAll();
 
                 // ======================================
                 // ADMINISTRADOR
                 // ======================================
-
-                .requestMatchers(
+                auth.requestMatchers(
                     "/api/admin/**"
-                ).hasRole("ADMIN")
+                ).hasRole("ADMIN");
 
                 // ======================================
                 // CAJERO Y ADMINISTRADOR
                 // ======================================
-
-                .requestMatchers(
+                auth.requestMatchers(
                     "/api/atenciones/**"
-                ).hasAnyRole("CAJERO", "ADMIN")
+                ).hasAnyRole("CAJERO", "ADMIN");
 
-                .requestMatchers(
+                auth.requestMatchers(
                     HttpMethod.GET,
                     "/api/pedidos/cajero/**"
-                ).hasAnyRole("CAJERO", "ADMIN")
+                ).hasAnyRole("CAJERO", "ADMIN");
 
                 // ======================================
-// COCINA
-// ======================================
+                // COCINA
+                // ======================================
+                auth.requestMatchers(
+                    HttpMethod.GET,
+                    "/api/pedidos/cocina"
+                ).hasAnyRole("COCINA", "ADMIN");
 
-// Consultar pedidos de cocina
-.requestMatchers(
-    HttpMethod.GET,
-    "/api/pedidos/cocina"
-).hasAnyRole("COCINA", "ADMIN")
-
-// Marcar pedidos como listos
-.requestMatchers(
-    HttpMethod.PATCH,
-    "/api/pedidos/*/listo"
-).hasAnyRole("COCINA", "ADMIN")
+                auth.requestMatchers(
+                    HttpMethod.PATCH,
+                    "/api/pedidos/*/listo"
+                ).hasAnyRole("COCINA", "ADMIN");
 
                 // ======================================
                 // MESEROS
                 // ======================================
-
-                .requestMatchers(
+                auth.requestMatchers(
                     HttpMethod.PATCH,
                     "/api/pedidos/*/entregado"
-                ).hasAnyRole("MESERO", "ADMIN")
+                ).hasAnyRole("MESERO", "ADMIN");
 
-                .requestMatchers(
+                auth.requestMatchers(
                     HttpMethod.GET,
                     "/api/pedidos/mesero"
-                ).hasAnyRole("MESERO", "ADMIN")
+                ).hasAnyRole("MESERO", "ADMIN");
 
                 // ======================================
                 // CLIENTES - PEDIDOS POR QR
                 // ======================================
-
-                .requestMatchers(
+                auth.requestMatchers(
                     HttpMethod.POST,
                     "/api/pedidos"
-                ).permitAll()
+                ).permitAll();
 
-                .requestMatchers(
+                auth.requestMatchers(
                     HttpMethod.GET,
                     "/api/pedidos/mesa/*"
-                ).permitAll()
+                ).permitAll();
 
                 // ======================================
-                // MENU PUBLICO Y MESAS
+                // MENÚ PÚBLICO Y MESAS
                 // ======================================
-
-                .requestMatchers(
+                auth.requestMatchers(
                     HttpMethod.GET,
                     "/api/productos/**",
                     "/api/categorias/**",
-                    "/api/mesas/**"
-                ).permitAll()
+                    "/api/mesas/**",
+                    "/api/promociones/vigentes"
+                ).permitAll();
 
                 // ======================================
                 // USUARIOS AUTENTICADOS
                 // ======================================
-
-                .requestMatchers(
+                auth.requestMatchers(
                     "/api/usuario/**"
-                ).authenticated()
+                ).authenticated();
 
-                // DEMAS ENDPOINTS
-
-                .anyRequest().authenticated()
-            );
+                // ======================================
+                // DEMÁS ENDPOINTS
+                // ======================================
+                auth.anyRequest().authenticated();
+            });
 
         return http.build();
     }
 
     // ==========================================
-    // CONFIGURACION CORS
+    // VERIFICAR PERFIL DE DESARROLLO
     // ==========================================
+    private boolean perfilDesarrolloActivo() {
+        return List.of(
+            org.springframework.core.env.AbstractEnvironment
+                .ACTIVE_PROFILES_PROPERTY_NAME
+        ).isEmpty();
+    }
 
+    // ==========================================
+    // CONFIGURACIÓN CORS
+    // ==========================================
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
@@ -241,9 +259,8 @@ public class SecurityConfig {
     }
 
     // ==========================================
-    // ENCRIPTACION DE CONTRASEÑAS
+    // ENCRIPTACIÓN DE CONTRASEÑAS
     // ==========================================
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

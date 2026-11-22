@@ -3,7 +3,6 @@ package com.example.mesaclick.Config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 
 import org.springframework.http.HttpMethod;
 
@@ -76,7 +75,9 @@ public class SecurityConfig {
 
                 auth.requestMatchers("/error").permitAll();
 
+                // ======================================
                 // CORS PREFLIGHT
+                // ======================================
                 auth.requestMatchers(
                     HttpMethod.OPTIONS, "/**"
                 ).permitAll();
@@ -106,12 +107,16 @@ public class SecurityConfig {
                     "/api/suscripciones/cancelar"
                 ).permitAll();
 
-
                 // ======================================
                 // IMÁGENES PÚBLICAS
                 // ======================================
                 auth.requestMatchers(
                     HttpMethod.GET,
+                    "/imagenes/productos/**"
+                ).permitAll();
+
+                auth.requestMatchers(
+                    HttpMethod.HEAD,
                     "/imagenes/productos/**"
                 ).permitAll();
 
@@ -201,16 +206,6 @@ public class SecurityConfig {
     }
 
     // ==========================================
-    // VERIFICAR PERFIL DE DESARROLLO
-    // ==========================================
-    private boolean perfilDesarrolloActivo() {
-        return List.of(
-            org.springframework.core.env.AbstractEnvironment
-                .ACTIVE_PROFILES_PROPERTY_NAME
-        ).isEmpty();
-    }
-
-    // ==========================================
     // CONFIGURACIÓN CORS
     // ==========================================
     @Bean
@@ -219,17 +214,20 @@ public class SecurityConfig {
         CorsConfiguration configuration =
                 new CorsConfiguration();
 
+        // DOMINIOS PERMITIDOS
         configuration.setAllowedOrigins(
             List.of(
                 "http://localhost:5173",
-                "https://mesaclick.tech",
-                "https://www.mesaclick.tech"
+                "https://mesaclicks.tech",
+                "https://www.mesaclicks.tech"
             )
         );
 
+        // MÉTODOS HTTP PERMITIDOS
         configuration.setAllowedMethods(
             List.of(
                 "GET",
+                "HEAD",
                 "POST",
                 "PUT",
                 "PATCH",
@@ -238,6 +236,7 @@ public class SecurityConfig {
             )
         );
 
+        // CABECERAS PERMITIDAS
         configuration.setAllowedHeaders(
             List.of(
                 "Authorization",

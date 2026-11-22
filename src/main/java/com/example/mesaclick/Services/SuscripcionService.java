@@ -20,6 +20,7 @@ public class SuscripcionService {
     private final SuscripcionRepository repository;
     private final TokenCancelacionCorreoRepository tokenCancelacionRepository;
     private final CorreoService correoService;
+    private final PlantillaBienvenidaCorreoService plantillaBienvenida;
     private final TokenSuscripcionService tokenService;
     private final TransactionTemplate transactionTemplate;
 
@@ -35,243 +36,160 @@ public SuscripcionService(
         TokenCancelacionCorreoRepository tokenCancelacionRepository,
         CorreoService correoService,
         TokenSuscripcionService tokenService,
-        TransactionTemplate transactionTemplate
+        TransactionTemplate transactionTemplate,
+        PlantillaBienvenidaCorreoService plantillaBienvenida
 ) {
     this.repository = repository;
     this.tokenCancelacionRepository = tokenCancelacionRepository;
     this.correoService = correoService;
     this.tokenService = tokenService;
     this.transactionTemplate = transactionTemplate;
+    this.plantillaBienvenida = plantillaBienvenida;
 }
 
 
-    public void registrar(
-            String correo,
-            Boolean aceptaPromociones
-    ) {
-
-        if (correo == null
-                || correo.trim().length() > 254
-                || !correo.trim().matches(
-                    "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
-                )) {
-            throw new IllegalArgumentException(
-                "Ingresa un correo electrónico válido."
-            );
-        }
-
-        if (!Boolean.TRUE.equals(aceptaPromociones)) {
-            throw new IllegalArgumentException(
-                "Debes autorizar el envío de promociones."
-            );
-        }
-
-        String correoNormalizado = correo.trim()
-                .toLowerCase(Locale.ROOT);
-
-        String token = tokenService.generarToken();
-        String hash = tokenService.generarHash(token);
-
-        // Guardar primero y confirmar la transacción
-        // antes de intentar enviar el correo.
-        boolean debeEnviar = Boolean.TRUE.equals(
-            transactionTemplate.execute(status -> {
-
-                LocalDateTime ahora = LocalDateTime.now();
-
-                Optional<Suscripcion> existente =
-                    repository.findByCorreoIgnoreCase(
-                        correoNormalizado
-                    );
-
-                Suscripcion suscripcion;
-
-                if (existente.isPresent()) {
-
-                    suscripcion = existente.get();
-
-                    // Ya está suscrito y confirmado.
-                    if (Boolean.TRUE.equals(
-                            suscripcion.getConfirmada())
-                            && Boolean.TRUE.equals(
-                                suscripcion.getAceptaPromociones())
-                            && suscripcion.getFechaCancelacion() == null) {
-                        return false;
-                    }
-
-                    // Evitar reenvíos frecuentes.
-                    LocalDateTime ultimoEnvio =
-                        suscripcion.getFechaEnvioConfirmacion();
-
-                    if (ultimoEnvio != null
-                            && ultimoEnvio.isAfter(
-                                ahora.minusMinutes(5)
-                            )) {
-                        return false;
-                    }
-
-                } else {
-                    suscripcion = new Suscripcion();
-                    suscripcion.setCorreo(correoNormalizado);
-                    suscripcion.setFechaRegistro(ahora);
-                }
-
-                suscripcion.setAceptaPromociones(true);
-                suscripcion.setConfirmada(false);
-                suscripcion.setFechaConsentimiento(ahora);
-                suscripcion.setFechaConfirmacion(null);
-                suscripcion.setFechaCancelacion(null);
-
-                suscripcion.setTokenConfirmacionHash(hash);
-                suscripcion.setTokenExpiracion(
-                    tokenService.generarExpiracion()
-                );
-
-                suscripcion.setFechaEnvioConfirmacion(ahora);
-
-                repository.save(suscripcion);
-
-                return true;
-            })
-        );
-
-        if (!debeEnviar) {
-            return;
-        }
-
-        String enlace = urlPublica
-                + "/api/suscripciones/confirmar?token="
-                + token;
-
-        String contenido = """
-                ¡Hola!
-
-                Gracias por registrarte para recibir
-                promociones y novedades de MesaClick.
-
-                Para confirmar tu suscripción,
-                abre el siguiente enlace:
-
-                %s
-
-                Este enlace vence en 24 horas.
-
-                Si no solicitaste esta suscripción,
-                puedes ignorar este mensaje.
-
-                Equipo MesaClick
-                """.formatted(enlace);
-
-        try {
-            correoService.enviarCorreo(
-                correoNormalizado,
-                "MesaClick - Confirma tu suscripción",
-                contenido
-            );
-        } catch (org.springframework.mail.MailException e) {
-            // No revelar información del correo al cliente.
-            // El token sigue vigente y podrá solicitarse
-            // otro enlace después del tiempo de espera.
-            System.err.println(
-                "No se pudo enviar el correo de confirmación: "
-                + e.getClass().getSimpleName()
-            );
-        }
-    }
-
     
-public boolean confirmar(String token) {
+public void registrar(
+        String correo,
+        Boolean aceptaPromociones
+) {
 
-    if (token == null
-            || !token.matches("[A-Za-z0-9_-]{43}")) {
-        return false;
+    if (correo == null
+            || correo.trim().length() > 254
+            || !correo.trim().matches(
+                "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+            )) {
+        throw new IllegalArgumentException(
+            "Ingresa un correo electrónico válido."
+        );
     }
 
-    String hash = tokenService.generarHash(token);
+    if (!Boolean.TRUE.equals(aceptaPromociones)) {
+        throw new IllegalArgumentException(
+            "Debes autorizar el envío de promociones."
+        );
+    }
 
+    String correoNormalizado = correo.trim()
+            .toLowerCase(Locale.ROOT);
+
+    // Generar un enlace personal de cancelación.
     String tokenCancelacion = tokenService.generarToken();
     String hashCancelacion =
             tokenService.generarHash(tokenCancelacion);
 
-    String correoConfirmado = transactionTemplate.execute(
-        status -> {
+    // Registrar y activar la suscripción antes de enviar.
+    boolean debeEnviar = Boolean.TRUE.equals(
+        transactionTemplate.execute(status -> {
 
-            Optional<Suscripcion> resultado =
-                repository.findByTokenConfirmacionHash(hash);
+            LocalDateTime ahora = LocalDateTime.now();
 
-            if (resultado.isEmpty()) {
-                return null;
+            Optional<Suscripcion> existente =
+                    repository.findByCorreoIgnoreCase(
+                        correoNormalizado
+                    );
+
+            Suscripcion suscripcion;
+
+            if (existente.isPresent()) {
+
+                suscripcion = existente.get();
+
+                // No enviar otro correo a un suscriptor activo.
+                if (Boolean.TRUE.equals(
+                        suscripcion.getConfirmada())
+                        && Boolean.TRUE.equals(
+                            suscripcion.getAceptaPromociones())
+                        && suscripcion.getFechaCancelacion() == null) {
+                    return false;
+                }
+
+                // Evitar reactivaciones y correos repetidos
+                // durante los siguientes 5 minutos.
+                LocalDateTime ultimoEnvio =
+                        suscripcion.getFechaEnvioConfirmacion();
+
+                if (ultimoEnvio != null
+                        && ultimoEnvio.isAfter(
+                            ahora.minusMinutes(5)
+                        )) {
+                    return false;
+                }
+
+            } else {
+
+                suscripcion = new Suscripcion();
+                suscripcion.setCorreo(correoNormalizado);
+                suscripcion.setFechaRegistro(ahora);
             }
 
-            Suscripcion suscripcion = resultado.get();
-
-            if (suscripcion.getTokenExpiracion() == null
-                    || !suscripcion.getTokenExpiracion()
-                        .isAfter(LocalDateTime.now())) {
-                return null;
-            }
-
+            // Activar inmediatamente la suscripción.
+            suscripcion.setAceptaPromociones(true);
             suscripcion.setConfirmada(true);
-            suscripcion.setFechaConfirmacion(
-                LocalDateTime.now()
-            );
 
-            // El enlace de confirmación ya no se puede reutilizar.
+            suscripcion.setFechaConsentimiento(ahora);
+            suscripcion.setFechaConfirmacion(ahora);
+            suscripcion.setFechaCancelacion(null);
+
+            // Ya no necesitamos un token de confirmación.
             suscripcion.setTokenConfirmacionHash(null);
             suscripcion.setTokenExpiracion(null);
 
-            // Generar el enlace personal de cancelación.
+            // Token para cancelar la suscripción.
             suscripcion.setTokenCancelacionHash(
                 hashCancelacion
             );
 
+            // Conservamos este campo para controlar
+            // los reenvíos del correo de bienvenida.
+            suscripcion.setFechaEnvioConfirmacion(ahora);
+
             repository.save(suscripcion);
 
-            return suscripcion.getCorreo();
-        }
+            return true;
+        })
     );
 
-    if (correoConfirmado == null) {
-        return false;
+    if (!debeEnviar) {
+        return;
     }
 
+    // Crear el enlace personal de cancelación.
     String enlaceCancelacion = frontendUrl
-        + "/cancelar-suscripcion?token="
-        + tokenCancelacion;
+            .replaceAll("/+$", "")
+            + "/cancelar-suscripcion?token="
+            + tokenCancelacion;
 
-    String contenido = """
-            ¡Hola!
-
-            Tu suscripción a las promociones
-            de MesaClick fue confirmada correctamente.
-
-            A partir de ahora podrás recibir
-            promociones y novedades.
-
-            Si deseas dejar de recibirlas,
-            utiliza este enlace:
-
-            %s
-
-            Equipo MesaClick
-            """.formatted(enlaceCancelacion);
+    // Generar el correo HTML de bienvenida.
+    String contenidoHtml = plantillaBienvenida.generar(
+        enlaceCancelacion
+    );
 
     try {
-        correoService.enviarCorreo(
-            correoConfirmado,
-            "MesaClick - Suscripción confirmada",
-            contenido
+
+        correoService.enviarCorreoHtml(
+            correoNormalizado,
+            "¡Bienvenido a MesaClick! 🎉",
+            contenidoHtml
         );
+
     } catch (org.springframework.mail.MailException e) {
+
+        // La suscripción permanece activa aunque
+        // falle el envío del correo.
         System.err.println(
-            "No se pudo enviar el enlace de cancelación: "
+            "No se pudo enviar el correo de bienvenida: "
+            + e.getClass().getSimpleName()
+        );
+
+    } catch (IllegalStateException e) {
+
+        System.err.println(
+            "No se pudo preparar el correo de bienvenida: "
             + e.getClass().getSimpleName()
         );
     }
-
-    return true;
 }
-
 
 
 public String generarEnlaceCancelacion(Suscripcion suscripcion) {

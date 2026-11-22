@@ -1,26 +1,28 @@
-
 package com.example.mesaclick.Model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 
 @Entity
 @Table(name = "mesas")
 public class Mesa {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_mesa")
     private Long id_mesa;
 
-    @Column(name = "numero_mesa")
+    @Column(name = "numero_mesa", nullable = false, unique = true)
     private int numero_mesa;
 
     @Column(name = "estado_mesa")
     private String estado_mesa;
 
-    @Column(name = "codigo_qr_mesa")
+    @Column(name = "codigo_qr_mesa", unique = true)
     private String codigoQrMesa;
 
     public Mesa() {

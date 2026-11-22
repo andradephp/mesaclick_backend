@@ -26,78 +26,64 @@ public class SuscripcionController {
             Boolean aceptaPromociones
     ) {}
 
+    // Registrar y activar la suscripción directamente.
     @PostMapping
     public ResponseEntity<Map<String, String>> registrar(
             @RequestBody SuscripcionRequest request
     ) {
 
         try {
+
             suscripcionService.registrar(
-                request.correo(),
-                request.aceptaPromociones()
+                    request.correo(),
+                    request.aceptaPromociones()
             );
 
             return ResponseEntity
-                .status(HttpStatus.ACCEPTED)
-                .body(Map.of(
-                    "mensaje",
-                    "Solicitud recibida. Revisa tu correo para confirmar la suscripción."
-                ));
+                    .status(HttpStatus.ACCEPTED)
+                    .body(Map.of(
+                            "mensaje",
+                            "¡Te has suscrito a MesaClick! Revisa tu correo para conocer nuestras novedades."
+                    ));
 
         } catch (IllegalArgumentException e) {
 
             return ResponseEntity.badRequest().body(
-                Map.of("mensaje", e.getMessage())
+                    Map.of("mensaje", e.getMessage())
             );
         }
     }
 
-    @GetMapping("/confirmar")
-    public ResponseEntity<String> confirmar(
-            @RequestParam String token
+    public record CancelacionRequest(
+            String token
+    ) {}
+
+    // Cancelar la suscripción desde el enlace personal.
+    @PostMapping("/cancelar")
+    public ResponseEntity<Map<String, String>> cancelar(
+            @RequestBody CancelacionRequest request
     ) {
 
-        boolean confirmado =
-            suscripcionService.confirmar(token);
+        boolean cancelada =
+                suscripcionService.cancelar(
+                        request.token()
+                );
 
-        if (!confirmado) {
+        if (!cancelada) {
+
             return ResponseEntity.badRequest().body(
-                "El enlace no es válido, ya fue utilizado o ha vencido."
+                    Map.of(
+                            "mensaje",
+                            "El enlace de cancelación no es válido."
+                    )
             );
         }
 
         return ResponseEntity.ok(
-            "¡Tu suscripción a MesaClick fue confirmada correctamente!"
+                Map.of(
+                        "mensaje",
+                        "Tu suscripción a MesaClick fue cancelada correctamente."
+                )
         );
     }
-
-
-public record CancelacionRequest(String token) {}
-
-@PostMapping("/cancelar")
-public ResponseEntity<Map<String, String>> cancelar(
-        @RequestBody CancelacionRequest request
-) {
-
-    boolean cancelada =
-        suscripcionService.cancelar(request.token());
-
-    if (!cancelada) {
-        return ResponseEntity.badRequest().body(
-            Map.of(
-                "mensaje",
-                "El enlace de cancelación no es válido."
-            )
-        );
-    }
-
-    return ResponseEntity.ok(
-        Map.of(
-            "mensaje",
-            "Tu suscripción a MesaClick fue cancelada correctamente."
-        )
-    );
-}
-
-
 }
